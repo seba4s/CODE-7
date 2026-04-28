@@ -1,0 +1,53 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Memory captures and crash reports
+MemoryCaptures/
+*.stackdump
+
+# IDE files
+.vs/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Unity3D generated meta files for generated assets
+Assets/AssetStoreTools*
+
+# Addressables generated files
+Assets/AddressableAssetsData/*/*.bin*
+
+# Auto-generated Visual Studio files
+ExportedObj/
+*.apk
+*.aab
+*.unitypackage
+
+# DotCover
+*.dotCover
+
+# Rider
+.idea/
