@@ -1,105 +1,98 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
 public class NarrativeUI : MonoBehaviour
 {
     public static NarrativeUI Instance { get; private set; }
-    public static bool IsGamePaused { get; private set; }  // Variable global de pausa
     public bool IsVisible => panel != null && panel.activeSelf;
+
+    // Segundos que el mensaje permanece visible antes de ocultarse
+    public float displayDuration = 5f;
 
     public GameObject panel;
     public TMP_Text titleText;
     public TMP_Text bodyText;
     public Image picture;
-    public Button closeButton;
 
-    // ── Auto-instalación ────────────────────────────────────
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    Transform player;
+    RectTransform panelRt;
+    Canvas rootCanvas;
+    public float worldYOffset = 2.3f;
+    public float screenYOffset = 56f;
+
+    // ── Auto-instalacion ──────────────────────────────────────
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void AutoInstall()
     {
-        if (FindAnyObjectByType<NarrativeUI>() != null) return;
-
-        // Crear EventSystem si no existe (necesario para clicks de UI)
-        if (FindAnyObjectByType<EventSystem>() == null)
+        SceneManager.sceneLoaded += (scene, _) =>
         {
-            var esGo = new GameObject("EventSystem");
-            esGo.AddComponent<EventSystem>();
-            Debug.Log("[NarrativeUI] EventSystem creado.");
-        }
+            if (!GameSceneConfig.IsGameplayScene(scene.name)) return;
+            if (FindAnyObjectByType<NarrativeUI>() != null) return;
 
-        var canvasGo = new GameObject("NarrativeUICanvas");
-        var canvas = canvasGo.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 1000;
+            if (FindAnyObjectByType<EventSystem>() == null)
+            {
+                var esGo = new GameObject("EventSystem");
+                esGo.AddComponent<EventSystem>();
+            }
 
-        canvasGo.AddComponent<CanvasScaler>();
-        canvasGo.AddComponent<GraphicRaycaster>();
+            var canvasGo = new GameObject("NarrativeUICanvas");
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 1000;
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasGo.AddComponent<GraphicRaycaster>();
 
-        var uiGo = new GameObject("NarrativeUIPanel");
-        uiGo.transform.SetParent(canvasGo.transform, false);
+            var uiGo = new GameObject("NarrativeUIPanel");
+            uiGo.transform.SetParent(canvasGo.transform, false);
 
-        var ui = uiGo.AddComponent<NarrativeUI>();
-        ui.CreateDefaultUI();
-        
-        Debug.Log("[NarrativeUI] Auto-instalado en la escena.");
+            var ui = uiGo.AddComponent<NarrativeUI>();
+            ui.CreateDefaultUI();
+        };
     }
 
     void Awake()
     {
         if (Instance == null) Instance = this;
-
+        rootCanvas = GetComponentInParent<Canvas>();
         EnsureReferences();
-        ConfigureReadableLayout();
-
-        if (panel != null)
-            Hide();
+        ConfigureLayout();
+        FindPlayerTransform();
+        if (panel != null) Hide();
     }
 
-    // Fallback: detectar click manualmente sobre el botón sin depender de EventSystem
-    void Update()
+    void LateUpdate()
     {
         if (!IsVisible) return;
-
-        if (Input.GetMouseButtonDown(0) && closeButton != null)
-        {
-            var rt = closeButton.GetComponent<RectTransform>();
-            if (rt != null && RectTransformUtility.RectangleContainsScreenPoint(rt, Input.mousePosition, null))
-            {
-                Debug.Log("[NarrativeUI] Click detectado sobre botón Cerrar (manual).");
-                Hide();
-            }
-        }
+        if (player == null) FindPlayerTransform();
+        UpdatePanelPositionAbovePlayer();
     }
 
     void OnDestroy()
     {
-        if (closeButton != null)
-            closeButton.onClick.RemoveListener(Hide);
-
         if (Instance == this) Instance = null;
     }
 
+    // ── API publica ───────────────────────────────────────────
+
     public void Show(NarrativeEntrySO entry)
     {
-        if (entry == null)
-        {
-            Debug.LogWarning("NarrativeUI.Show: entry es null.");
-            return;
-        }
-
+        if (entry == null) { Debug.LogWarning("NarrativeUI.Show: entry es null."); return; }
         if (panel == null || titleText == null || bodyText == null)
         {
-            Debug.LogError("NarrativeUI: faltan referencias de UI en el Inspector.");
+            Debug.LogError("NarrativeUI: faltan referencias de UI.");
             return;
         }
-
-        ConfigureReadableLayout();
 
         panel.SetActive(true);
         titleText.text = entry.title;
-        bodyText.text = entry.body;
+        bodyText.text  = entry.body;
 
         if (picture != null)
         {
@@ -108,197 +101,144 @@ public class NarrativeUI : MonoBehaviour
             if (hasPic) picture.sprite = entry.picture;
         }
 
-        // Parar al jugador
-        var playerRb = GetPlayerRigidbody();
-        if (playerRb != null) playerRb.linearVelocity = Vector2.zero;
-
-        // Mostrar cursor para poder hacer click en el botón
-        Cursor.visible = true;
-        Cursor.lockState = CursorLockMode.None;
-
-        IsGamePaused = true;
+        // Auto-ocultar despues de displayDuration segundos
+        StopAllCoroutines();
+        StartCoroutine(AutoHide());
     }
 
     public void Hide()
     {
-        if (panel == null) return;
-        panel.SetActive(false);
-        IsGamePaused = false;
+        StopAllCoroutines();
+        if (panel != null) panel.SetActive(false);
     }
 
-    Rigidbody2D GetPlayerRigidbody()
+    // ── Privado ───────────────────────────────────────────────
+
+    IEnumerator AutoHide()
     {
-        var pc = FindAnyObjectByType<PlayerController2D>();
-        return pc != null ? pc.GetComponent<Rigidbody2D>() : null;
+        yield return new WaitForSeconds(displayDuration);
+        Hide();
     }
 
     void EnsureReferences()
     {
-        if (panel == null)
-            panel = gameObject;
-
-        if (titleText == null)
-            titleText = panel.GetComponentInChildren<TMP_Text>(true);
-
+        if (panel == null) panel = gameObject;
+        if (panelRt == null) panelRt = panel.GetComponent<RectTransform>();
+        if (titleText == null) titleText = panel.GetComponentInChildren<TMP_Text>(true);
         if (bodyText == null)
         {
             var texts = panel.GetComponentsInChildren<TMP_Text>(true);
             if (texts.Length > 1) bodyText = texts[1];
         }
-
-        if (closeButton == null)
-            closeButton = panel.GetComponentInChildren<Button>(true);
     }
 
     void CreateDefaultUI()
     {
         panel = gameObject;
-        var panelRt = panel.AddComponent<RectTransform>();
-        panelRt.anchorMin = new Vector2(0.5f, 0.5f);
-        panelRt.anchorMax = new Vector2(0.5f, 0.5f);
-        panelRt.pivot = new Vector2(0.5f, 0.5f);
-        panelRt.anchoredPosition = Vector2.zero;
-        panelRt.sizeDelta = new Vector2(780f, 420f);
+        panelRt = panel.AddComponent<RectTransform>();
+        // El panel se reposiciona dinamicamente sobre el jugador
+        panelRt.anchorMin        = new Vector2(0f, 0f);
+        panelRt.anchorMax        = new Vector2(0f, 0f);
+        panelRt.pivot            = new Vector2(0.5f, 0f);
+        panelRt.anchoredPosition = new Vector2(960f, 220f);
+        panelRt.sizeDelta        = new Vector2(860f, 190f);
 
         var bg = panel.AddComponent<Image>();
-        bg.color = new Color(0.1f, 0.1f, 0.1f, 0.85f);
+        bg.color = new Color(0.05f, 0.06f, 0.14f, 0.88f);
 
-        // Título
+        // Linea de acento lateral izquierda
+        var accent = new GameObject("Accent", typeof(RectTransform));
+        accent.transform.SetParent(panel.transform, false);
+        var aImg = accent.AddComponent<Image>();
+        aImg.color = new Color(0.35f, 0.65f, 1f, 0.9f);
+        var aRt = accent.GetComponent<RectTransform>();
+        aRt.anchorMin        = new Vector2(0f, 0f);
+        aRt.anchorMax        = new Vector2(0f, 1f);
+        aRt.pivot            = new Vector2(0f, 0.5f);
+        aRt.anchoredPosition = Vector2.zero;
+        aRt.sizeDelta        = new Vector2(4f, 0f);
+
+        // Titulo
         var titleGo = new GameObject("Title", typeof(RectTransform));
         titleGo.transform.SetParent(panel.transform, false);
         titleText = titleGo.AddComponent<TextMeshProUGUI>();
-        titleText.text = "Título";
-        titleText.fontSize = 34;
-        titleText.color = Color.white;
+        titleText.text      = "Titulo";
+        titleText.fontSize  = 28;
+        titleText.color     = new Color(0.6f, 0.85f, 1f);
+        titleText.fontStyle = FontStyles.Bold;
         titleText.alignment = TextAlignmentOptions.TopLeft;
         var titleRt = titleGo.GetComponent<RectTransform>();
-        titleRt.anchorMin = new Vector2(0f, 1f);
-        titleRt.anchorMax = new Vector2(1f, 1f);
-        titleRt.pivot = new Vector2(0.5f, 1f);
-        titleRt.offsetMin = new Vector2(24f, -88f);
-        titleRt.offsetMax = new Vector2(-120f, -24f);
+        titleRt.anchorMin        = new Vector2(0f, 1f);
+        titleRt.anchorMax        = new Vector2(1f, 1f);
+        titleRt.pivot            = new Vector2(0.5f, 1f);
+        titleRt.anchoredPosition = Vector2.zero;
+        titleRt.offsetMin        = new Vector2(18f, -46f);
+        titleRt.offsetMax        = new Vector2(-12f, -10f);
 
-        // Body
+        // Cuerpo
         var bodyGo = new GameObject("Body", typeof(RectTransform));
         bodyGo.transform.SetParent(panel.transform, false);
         bodyText = bodyGo.AddComponent<TextMeshProUGUI>();
-        bodyText.text = "Mensaje";
-        bodyText.fontSize = 28;
-        bodyText.color = Color.white;
-        bodyText.alignment = TextAlignmentOptions.TopLeft;
-        bodyText.overflowMode = TextOverflowModes.Overflow;
+        bodyText.text          = "Mensaje";
+        bodyText.fontSize      = 24;
+        bodyText.color         = new Color(0.85f, 0.85f, 0.85f);
+        bodyText.alignment     = TextAlignmentOptions.TopLeft;
+        bodyText.overflowMode  = TextOverflowModes.Truncate;
+        bodyText.textWrappingMode = TextWrappingModes.Normal;
         var bodyRt = bodyGo.GetComponent<RectTransform>();
-        bodyRt.anchorMin = new Vector2(0f, 0f);
-        bodyRt.anchorMax = new Vector2(1f, 1f);
-        bodyRt.pivot = new Vector2(0.5f, 0.5f);
-        bodyRt.offsetMin = new Vector2(24f, 24f);
-        bodyRt.offsetMax = new Vector2(-24f, -96f);
-
-        // Botón Cerrar
-        var buttonGo = new GameObject("CloseButton", typeof(RectTransform));
-        buttonGo.transform.SetParent(panel.transform, false);
-        closeButton = buttonGo.AddComponent<Button>();
-        closeButton.interactable = true;
-        closeButton.transition = Selectable.Transition.ColorTint;
-        
-        var buttonRt = buttonGo.GetComponent<RectTransform>();
-        buttonRt.anchorMin = new Vector2(1f, 1f);
-        buttonRt.anchorMax = new Vector2(1f, 1f);
-        buttonRt.pivot = new Vector2(1f, 1f);
-        buttonRt.anchoredPosition = new Vector2(-24f, -24f);
-        buttonRt.sizeDelta = new Vector2(140f, 48f);
-
-        var buttonImage = buttonGo.AddComponent<Image>();
-        buttonImage.color = new Color(0.3f, 0.3f, 0.3f, 0.8f);
-        buttonImage.raycastTarget = true;  // ¡IMPORTANTE! Sin esto el click no llega al botón
-
-        var buttonText = new GameObject("Text", typeof(RectTransform));
-        buttonText.transform.SetParent(buttonGo.transform, false);
-        var btnTxt = buttonText.AddComponent<TextMeshProUGUI>();
-        btnTxt.text = "Cerrar";
-        btnTxt.fontSize = 20;
-        btnTxt.color = Color.white;
-        btnTxt.alignment = TextAlignmentOptions.Center;
-        var txtRt = buttonText.GetComponent<RectTransform>();
-        txtRt.anchorMin = Vector2.zero;
-        txtRt.anchorMax = Vector2.one;
-        txtRt.offsetMin = Vector2.zero;
-        txtRt.offsetMax = Vector2.zero;
-
-        // Conectar listener al botón inmediatamente
-        if (closeButton != null)
-        {
-            closeButton.onClick.AddListener(Hide);
-            Debug.Log("[NarrativeUI] Botón Cerrar conectado en CreateDefaultUI().");
-        }
+        bodyRt.anchorMin        = new Vector2(0f, 0f);
+        bodyRt.anchorMax        = new Vector2(1f, 1f);
+        bodyRt.pivot            = new Vector2(0.5f, 0.5f);
+        bodyRt.offsetMin        = new Vector2(18f, 10f);
+        bodyRt.offsetMax        = new Vector2(-12f, -50f);
     }
 
-    void ConfigureReadableLayout()
+    void ConfigureLayout()
     {
         if (panel == null) return;
 
-        var panelRt = panel.GetComponent<RectTransform>();
+        if (panelRt == null) panelRt = panel.GetComponent<RectTransform>();
         if (panelRt != null)
         {
-            panelRt.anchorMin = new Vector2(0.5f, 0.5f);
-            panelRt.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRt.pivot = new Vector2(0.5f, 0.5f);
-            panelRt.anchoredPosition = Vector2.zero;
-            panelRt.sizeDelta = new Vector2(780f, 420f);
+            panelRt.anchorMin        = new Vector2(0f, 0f);
+            panelRt.anchorMax        = new Vector2(0f, 0f);
+            panelRt.pivot            = new Vector2(0.5f, 0f);
+            panelRt.anchoredPosition = new Vector2(Screen.width * 0.5f, 220f);
+            panelRt.sizeDelta        = new Vector2(860f, 190f);
         }
+    }
 
-        if (titleText != null)
+    void FindPlayerTransform()
+    {
+        var playerObj = GameObject.FindWithTag("Player");
+        if (playerObj == null)
         {
-            titleText.textWrappingMode = TextWrappingModes.Normal;
-            titleText.fontSize = 34f;
-            titleText.alignment = TextAlignmentOptions.TopLeft;
-
-            var rt = titleText.rectTransform;
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.offsetMin = new Vector2(24f, -88f);
-            rt.offsetMax = new Vector2(-120f, -24f);
+            var pc = FindAnyObjectByType<PlayerController2D>();
+            if (pc != null) playerObj = pc.gameObject;
         }
 
-        if (bodyText != null)
-        {
-            bodyText.textWrappingMode = TextWrappingModes.Normal;
-            bodyText.overflowMode = TextOverflowModes.Overflow;
-            bodyText.fontSize = 28f;
-            bodyText.alignment = TextAlignmentOptions.TopLeft;
+        if (playerObj != null)
+            player = playerObj.transform;
+    }
 
-            var rt = bodyText.rectTransform;
-            rt.anchorMin = new Vector2(0f, 0f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.offsetMin = new Vector2(24f, 24f);
-            rt.offsetMax = new Vector2(-24f, -96f);
-        }
+    void UpdatePanelPositionAbovePlayer()
+    {
+        if (panelRt == null || player == null) return;
 
-        if (closeButton != null)
-        {
-            var buttonRt = closeButton.GetComponent<RectTransform>();
-            if (buttonRt != null)
-            {
-                buttonRt.anchorMin = new Vector2(1f, 1f);
-                buttonRt.anchorMax = new Vector2(1f, 1f);
-                buttonRt.pivot = new Vector2(1f, 1f);
-                buttonRt.anchoredPosition = new Vector2(-24f, -24f);
-                buttonRt.sizeDelta = new Vector2(140f, 48f);
-            }
+        var cam = Camera.main;
+        if (cam == null) return;
 
-            var tmp = closeButton.GetComponentInChildren<TMP_Text>(true);
-            if (tmp != null)
-            {
-                tmp.text = "Cerrar";
-                tmp.fontSize = 24f;
-                tmp.alignment = TextAlignmentOptions.Center;
-            }
+        Vector3 worldPos = player.position + Vector3.up * worldYOffset;
+        Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
 
-            var legacy = closeButton.GetComponentInChildren<Text>(true);
-            if (legacy != null)
-                legacy.text = "Cerrar";
-        }
+        if (screenPos.z <= 0f) return;
+
+        Vector2 target = new Vector2(screenPos.x, screenPos.y + screenYOffset);
+        Vector2 size = panelRt.sizeDelta;
+
+        float clampedX = Mathf.Clamp(target.x, size.x * 0.5f + 12f, Screen.width - size.x * 0.5f - 12f);
+        float clampedY = Mathf.Clamp(target.y, 12f, Screen.height - size.y - 12f);
+
+        panelRt.anchoredPosition = new Vector2(clampedX, clampedY);
     }
 }

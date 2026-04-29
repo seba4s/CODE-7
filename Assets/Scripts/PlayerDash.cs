@@ -40,9 +40,6 @@ public class PlayerDash : MonoBehaviour
 
     void Update()
     {
-        // No procesar input si el juego está pausado por NarrativeUI
-        if (NarrativeUI.IsGamePaused) return;
-
         float x = Input.GetAxisRaw("Horizontal");
         if (x > 0.01f) lastNonZeroDir = Vector2.right;
         else if (x < -0.01f) lastNonZeroDir = Vector2.left;

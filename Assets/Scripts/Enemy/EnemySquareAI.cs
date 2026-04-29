@@ -8,6 +8,14 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider2D))]
 public class EnemySquareAI : MonoBehaviour, IDamageable
 {
+    public enum EnemyVariant
+    {
+        BasicMelee,
+        Runner,
+        Tank,
+        Glitch
+    }
+
     // ── Estadísticas ──────────────────────────────────────────
     [Header("Stats")]
     public int   maxHp         = 30;
@@ -26,6 +34,9 @@ public class EnemySquareAI : MonoBehaviour, IDamageable
     public float loseRange    = 10f;
     public float attackRange  = 0.6f;   // distancia para daño de contacto
 
+    [Header("Variant")]
+    public EnemyVariant variant = EnemyVariant.BasicMelee;
+
     // ── Estado interno ────────────────────────────────────────
     enum State { Patrol, Chase, Attack }
     State     state        = State.Patrol;
@@ -35,6 +46,7 @@ public class EnemySquareAI : MonoBehaviour, IDamageable
     Vector2   spawnPoint;
     float     patrolTarget;   // X hacia la que patrulla ahora
     float     nextDamageTime;
+    float     nextGlitchBurstTime;
     SpriteRenderer sr;
 
     // ── Colores por estado ────────────────────────────────────
@@ -50,6 +62,8 @@ public class EnemySquareAI : MonoBehaviour, IDamageable
         currentHp  = maxHp;
         spawnPoint = transform.position;
         patrolTarget = spawnPoint.x + patrolRange;
+
+        ApplyVariantStats();
 
         rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         rb.gravityScale = 3f;
@@ -67,9 +81,6 @@ public class EnemySquareAI : MonoBehaviour, IDamageable
     void Update()
     {
         if (playerTransform == null) return;
-        
-        // Si el juego está pausado por NarrativeUI, no actuar
-        if (NarrativeUI.IsGamePaused) return;
 
         float distToPlayer = Vector2.Distance(transform.position, playerTransform.position);
 
@@ -119,7 +130,15 @@ public class EnemySquareAI : MonoBehaviour, IDamageable
     void DoChase()
     {
         float dir = playerTransform.position.x > transform.position.x ? 1f : -1f;
-        rb.linearVelocity = new Vector2(dir * chaseSpeed, rb.linearVelocity.y);
+
+        float burst = 1f;
+        if (variant == EnemyVariant.Glitch && Time.time >= nextGlitchBurstTime)
+        {
+            burst = 1.8f;
+            nextGlitchBurstTime = Time.time + 0.55f;
+        }
+
+        rb.linearVelocity = new Vector2(dir * chaseSpeed * burst, rb.linearVelocity.y);
     }
 
     // ── Atacar (daño de contacto continuo) ────────────────────
@@ -172,7 +191,7 @@ public class EnemySquareAI : MonoBehaviour, IDamageable
     void ChangeState(State next)
     {
         state = next;
-        if (sr != null)
+        if (sr != null && variant == EnemyVariant.BasicMelee)
             sr.color = next == State.Patrol ? ColorPatrol
                      : next == State.Chase  ? ColorChase
                      : ColorAttack;
@@ -183,6 +202,50 @@ public class EnemySquareAI : MonoBehaviour, IDamageable
             spawnPoint = transform.position;
             patrolTarget = transform.position.x + patrolRange;
         }
+    }
+
+    void ApplyVariantStats()
+    {
+        if (sr == null) return;
+
+        switch (variant)
+        {
+            case EnemyVariant.Runner:
+                maxHp = Mathf.RoundToInt(maxHp * 0.75f);
+                patrolSpeed *= 1.35f;
+                chaseSpeed *= 1.55f;
+                contactDamage = Mathf.RoundToInt(contactDamage * 0.85f);
+                detectRange += 1.2f;
+                sr.color = new Color(1f, 0.45f, 0.2f, 1f);
+                transform.localScale *= 0.88f;
+                break;
+
+            case EnemyVariant.Tank:
+                maxHp = Mathf.RoundToInt(maxHp * 1.9f);
+                patrolSpeed *= 0.72f;
+                chaseSpeed *= 0.68f;
+                contactDamage = Mathf.RoundToInt(contactDamage * 1.65f);
+                detectRange -= 0.4f;
+                sr.color = new Color(0.7f, 0.16f, 0.16f, 1f);
+                transform.localScale *= 1.28f;
+                break;
+
+            case EnemyVariant.Glitch:
+                maxHp = Mathf.RoundToInt(maxHp * 1.1f);
+                patrolSpeed *= 1.1f;
+                chaseSpeed *= 1.18f;
+                contactDamage = Mathf.RoundToInt(contactDamage * 1.2f);
+                detectRange += 0.8f;
+                damageInterval *= 0.8f;
+                sr.color = new Color(0.95f, 0.12f, 0.62f, 1f);
+                break;
+
+            default:
+                sr.color = ColorPatrol;
+                break;
+        }
+
+        currentHp = maxHp;
     }
 
     // ── IDamageable ──────────────────────────────────────────

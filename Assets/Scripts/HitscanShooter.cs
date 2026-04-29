@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.EventSystems;
+using System;
 
 public class HitscanShooter : MonoBehaviour
 {
@@ -11,11 +13,21 @@ public class HitscanShooter : MonoBehaviour
 
     [Header("Stats")]
     [Tooltip("Alcance máximo del disparo en unidades")]
-    public float range = 12f;
+    public float range = 5f;
     public int damage = 10;
     public float fireRate = 10f;
     public LayerMask hitMask;
     public bool autoIncludeGroundEnemyMask = true;
+
+    [Header("Laser Energy")]
+    [Tooltip("Carga maxima del laser")]
+    public float maxLaserCharge = 100f;
+    [Tooltip("Cuanta carga consume cada disparo")]
+    public float dischargePerShot = 20f;
+    [Tooltip("Cuanta carga recupera por segundo")]
+    public float rechargePerSecond = 20f;
+    [Tooltip("Retardo antes de empezar a recargar tras disparar")]
+    public float rechargeDelayAfterShot = 0.45f;
 
     [Header("Debug")]
     public bool debugDrawRay = true;
@@ -35,8 +47,14 @@ public class HitscanShooter : MonoBehaviour
 
     /// <summary>Se invoca al disparar. Paramámetros: posición del cañón, dirección del disparo.</summary>
     public System.Action<Vector2, Vector2> OnShot;
+    public event Action<float, float> OnLaserChargeChanged; // current, max
+
+    public float CurrentLaserCharge => currentLaserCharge;
+    public float MaxLaserCharge => maxLaserCharge;
 
     float nextFireTime;
+    float currentLaserCharge;
+    float nextRechargeTime;
     Coroutine lineRoutine;
 
     void Awake()
@@ -48,6 +66,9 @@ public class HitscanShooter : MonoBehaviour
         if (shotLine == null) shotLine = CreateRuntimeShotLine();
         if (shotLine != null && shotLine.positionCount < 2) shotLine.positionCount = 2;
         ConfigureShotLine(shotLine);
+
+        currentLaserCharge = Mathf.Clamp(currentLaserCharge <= 0f ? maxLaserCharge : currentLaserCharge, 0f, maxLaserCharge);
+        OnLaserChargeChanged?.Invoke(currentLaserCharge, maxLaserCharge);
     }
 
     void Start()
@@ -66,21 +87,33 @@ public class HitscanShooter : MonoBehaviour
 
     void Update()
     {
-        // No disparar si el juego está pausado por NarrativeUI
-        if (NarrativeUI.IsGamePaused) return;
+        string sceneName = GameSceneConfig.CurrentSceneName();
+        if (!GameSceneConfig.IsCombatInputScene(sceneName)) return;
+
+        // No disparar cuando el click es sobre UI (botones del menú/tutorial)
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
 
         // Disparo con click izquierdo
         if (Input.GetMouseButtonDown(0))
         {
             TryShoot();
         }
+
+        RechargeLaser();
     }
 
     void TryShoot(bool ignoreCooldown = false)
     {
+        // Recurso del laser
+        if (currentLaserCharge < dischargePerShot) return;
+
         // Cooldown
         if (!ignoreCooldown && Time.time < nextFireTime) return;
         nextFireTime = Time.time + 1f / Mathf.Max(fireRate, 0.1f);
+
+        currentLaserCharge = Mathf.Max(0f, currentLaserCharge - Mathf.Max(0f, dischargePerShot));
+        nextRechargeTime = Time.time + Mathf.Max(0f, rechargeDelayAfterShot);
+        OnLaserChargeChanged?.Invoke(currentLaserCharge, maxLaserCharge);
 
         // Origen
         Vector2 origin = muzzle != null
@@ -161,6 +194,15 @@ public class HitscanShooter : MonoBehaviour
 
         // Notificar a suscriptores (ej: PlayerVFX para shake/flash)
         OnShot?.Invoke(origin, dir);
+    }
+
+    void RechargeLaser()
+    {
+        if (Time.time < nextRechargeTime) return;
+        if (currentLaserCharge >= maxLaserCharge) return;
+
+        currentLaserCharge = Mathf.Min(maxLaserCharge, currentLaserCharge + Mathf.Max(0f, rechargePerSecond) * Time.deltaTime);
+        OnLaserChargeChanged?.Invoke(currentLaserCharge, maxLaserCharge);
     }
 
     Vector2 GetShootDirection(Vector2 origin)

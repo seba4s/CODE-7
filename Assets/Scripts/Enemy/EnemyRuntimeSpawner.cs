@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Genera enemigos cuadrados en runtime al dar Play.
@@ -16,6 +17,8 @@ public class EnemyRuntimeSpawner : MonoBehaviour
         public Vector2 position;
         [Tooltip("Rango de patrulla a cada lado desde su posición inicial")]
         public float patrolRange;
+        [Tooltip("Variante de archivo infectado")]
+        public EnemySquareAI.EnemyVariant variant;
     }
 
     [Header("Configuración de spawn")]
@@ -27,14 +30,14 @@ public class EnemyRuntimeSpawner : MonoBehaviour
     [Tooltip("Lista de posiciones donde se crean enemigos al iniciar")]
     public SpawnEntry[] spawnPoints = new SpawnEntry[]
     {
-        new SpawnEntry { position = new Vector2( 8f, 1f),  patrolRange = 3f },
-        new SpawnEntry { position = new Vector2(22f, 2.1f), patrolRange = 2f },
-        new SpawnEntry { position = new Vector2(33f, 2.1f), patrolRange = 3f },
-        new SpawnEntry { position = new Vector2(48f, 3.0f), patrolRange = 3f },
-        new SpawnEntry { position = new Vector2(64f, 2.3f), patrolRange = 3f },
-        new SpawnEntry { position = new Vector2(82f, 3.1f), patrolRange = 4f },
-        new SpawnEntry { position = new Vector2(100f, 3.4f), patrolRange = 4f },
-        new SpawnEntry { position = new Vector2(-6f, 1f),  patrolRange = 2f },
+        new SpawnEntry { position = new Vector2( 8f, 1f),  patrolRange = 3f, variant = EnemySquareAI.EnemyVariant.BasicMelee },
+        new SpawnEntry { position = new Vector2(22f, 2.1f), patrolRange = 2f, variant = EnemySquareAI.EnemyVariant.BasicMelee },
+        new SpawnEntry { position = new Vector2(33f, 2.1f), patrolRange = 3f, variant = EnemySquareAI.EnemyVariant.BasicMelee },
+        new SpawnEntry { position = new Vector2(48f, 3.0f), patrolRange = 3f, variant = EnemySquareAI.EnemyVariant.Runner },
+        new SpawnEntry { position = new Vector2(64f, 2.3f), patrolRange = 3f, variant = EnemySquareAI.EnemyVariant.Runner },
+        new SpawnEntry { position = new Vector2(82f, 3.1f), patrolRange = 4f, variant = EnemySquareAI.EnemyVariant.Tank },
+        new SpawnEntry { position = new Vector2(100f, 3.4f), patrolRange = 4f, variant = EnemySquareAI.EnemyVariant.Glitch },
+        new SpawnEntry { position = new Vector2(-6f, 1f),  patrolRange = 2f, variant = EnemySquareAI.EnemyVariant.BasicMelee },
     };
 
     [Header("Stats compartidos (aplica a todos los que se generen aquí)")]
@@ -54,20 +57,25 @@ public class EnemyRuntimeSpawner : MonoBehaviour
     Transform player;
 
     // ── Auto-instalación: se crea solo al iniciar la escena ──
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void AutoInstall()
     {
-        // Solo instalar si todavía no hay un spawner en la escena
-        if (FindAnyObjectByType<EnemyRuntimeSpawner>() != null) return;
-        var go = new GameObject("EnemySpawner");
-        go.AddComponent<EnemyRuntimeSpawner>();
-        Debug.Log("[EnemyRuntimeSpawner] Auto-instalado en la escena.");
+        SceneManager.sceneLoaded += (scene, _) =>
+        {
+            if (!GameSceneConfig.IsCombatInputScene(scene.name)) return;
+            if (FindAnyObjectByType<EnemyRuntimeSpawner>() != null) return;
+            var go = new GameObject("EnemySpawner");
+            go.AddComponent<EnemyRuntimeSpawner>();
+            Debug.Log("[EnemyRuntimeSpawner] Auto-instalado en la escena.");
+        };
     }
 
     void Start()
     {
         enemyLayer = LayerMask.NameToLayer("Enemy");
         if (enemyLayer < 0) enemyLayer = 0;   // fallback a Default
+
+        ConfigureForCurrentScene();
 
         var playerObj = GameObject.FindWithTag("Player");
         if (playerObj == null)
@@ -79,6 +87,34 @@ public class EnemyRuntimeSpawner : MonoBehaviour
 
         if (spawnOnStart)
             SpawnAll();
+    }
+
+    void ConfigureForCurrentScene()
+    {
+        if (!GameSceneConfig.IsGameplayScene(GameSceneConfig.CurrentSceneName())) return;
+
+        spawnOnStart = false;
+        spawnWhenPlayerXAtLeast = 10f;
+
+        spawnPoints = new SpawnEntry[]
+        {
+            new SpawnEntry { position = new Vector2(14f, 1.4f),  patrolRange = 3.5f, variant = EnemySquareAI.EnemyVariant.BasicMelee },
+            new SpawnEntry { position = new Vector2(27f, 2.2f),  patrolRange = 2.5f, variant = EnemySquareAI.EnemyVariant.BasicMelee },
+            new SpawnEntry { position = new Vector2(42f, 4.9f),  patrolRange = 2.0f, variant = EnemySquareAI.EnemyVariant.Runner },
+            new SpawnEntry { position = new Vector2(56f, 0.8f),  patrolRange = 4.0f, variant = EnemySquareAI.EnemyVariant.Runner },
+            new SpawnEntry { position = new Vector2(73f, 2.8f),  patrolRange = 3.0f, variant = EnemySquareAI.EnemyVariant.Tank },
+            new SpawnEntry { position = new Vector2(86f, 4.6f),  patrolRange = 2.5f, variant = EnemySquareAI.EnemyVariant.Glitch },
+            new SpawnEntry { position = new Vector2(111f, 3.7f), patrolRange = 2.5f, variant = EnemySquareAI.EnemyVariant.Tank },
+            new SpawnEntry { position = new Vector2(125f, 6.0f), patrolRange = 3.0f, variant = EnemySquareAI.EnemyVariant.Glitch },
+            new SpawnEntry { position = new Vector2(138f, 6.9f), patrolRange = 3.0f, variant = EnemySquareAI.EnemyVariant.Glitch },
+            new SpawnEntry { position = new Vector2(145f, 8.4f), patrolRange = 2.2f, variant = EnemySquareAI.EnemyVariant.Runner },
+        };
+
+        enemyHp = 34;
+        patrolSpeed = 2.1f;
+        chaseSpeed = 4.3f;
+        detectRange = 6.5f;
+        attackRange = 0.65f;
     }
 
     void Update()
@@ -134,6 +170,7 @@ public class EnemyRuntimeSpawner : MonoBehaviour
         ai.patrolRange  = entry.patrolRange;
         ai.detectRange  = detectRange;
         ai.attackRange  = attackRange;
+        ai.variant = entry.variant;
     }
 
     /// <summary>

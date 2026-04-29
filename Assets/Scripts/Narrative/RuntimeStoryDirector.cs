@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Inicia una historia base por progreso horizontal.
@@ -25,41 +26,45 @@ public class RuntimeStoryDirector : MonoBehaviour
         {
             triggerX = 6f,
             id = "beat_001",
-            title = "Código-7 // Señal Intervenida",
-            body = "Interceptaste una transmisión: 'La Base Delta guarda el archivo C7'. Avanza al este y busca terminales activas."
+            title = "Disco Duro // Diagnostico Inicial",
+            body = "LUMA: Diagnostico completado. El Disco Duro esta bajo ataque. Sebastian podria perderlo todo. Cruza el pasillo de arranque y estabiliza el sector industrial."
         },
         new StoryBeat
         {
-            triggerX = 30f,
+            triggerX = 42f,
             id = "beat_002",
-            title = "Código-7 // Primer Hallazgo",
-            body = "Entre ruinas encuentras rastros de pruebas humanas. El archivo menciona un proyecto llamado 'Espejo'."
+            title = "ERASER-Omega // Proyeccion Intrusa",
+            body = "ERASER-Omega: Crees que un poco de limpieza detendra el Borrado Final? Lo que se olvida, me pertenece. Cada plato que gira me entrega otro recuerdo abandonado."
         },
         new StoryBeat
         {
-            triggerX = 60f,
+            triggerX = 88f,
             id = "beat_003",
-            title = "Código-7 // Advertencia",
-            body = "'Si lees esto, ya te detectaron'. La seguridad de la corporación aumenta cuanto más te acercas al núcleo."
+            title = "LUMA // Carpeta Oculta",
+            body = "LUMA detecta una firma inusual detras de las carpetas corrompidas. Hay un archivo oculto que no figura en el indice principal. Podria ser una foto clave del usuario."
         },
         new StoryBeat
         {
-            triggerX = 95f,
+            triggerX = 110f,
             id = "beat_004",
-            title = "Código-7 // Objetivo Actualizado",
-            body = "Llegaste al borde del sector. Próximo objetivo: infiltrar la torre central y extraer la verdad del Proyecto Espejo."
+            title = "Registro de Arranque // Eco Emocional",
+            body = "Al insertar los datos en el Puerto de Salida se reconstruye la primera foto de Sebastian. Codigo-7 detecta un eco emocional y su visor cambia brevemente a verde antes de fijar el siguiente objetivo."
         }
     };
 
     Transform player;
-    string currentObjective = "Objetivo: Avanza hacia el este y recupera información.";
+    string currentObjective = "Objetivo: Recolecta 80 datos y activa 3 terminales de reparacion para abrir el Puerto de Salida.";
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void AutoInstall()
     {
-        if (FindAnyObjectByType<RuntimeStoryDirector>() != null) return;
-        var go = new GameObject("RuntimeStoryDirector");
-        go.AddComponent<RuntimeStoryDirector>();
+        SceneManager.sceneLoaded += (scene, _) =>
+        {
+            if (!GameSceneConfig.IsGameplayScene(scene.name)) return;
+            if (FindAnyObjectByType<RuntimeStoryDirector>() != null) return;
+            var go = new GameObject("RuntimeStoryDirector");
+            go.AddComponent<RuntimeStoryDirector>();
+        };
     }
 
     void Start()
@@ -67,7 +72,7 @@ public class RuntimeStoryDirector : MonoBehaviour
         var playerObj = GameObject.FindWithTag("Player");
         if (playerObj == null)
         {
-            var pc = FindFirstObjectByType<PlayerController2D>();
+            var pc = FindAnyObjectByType<PlayerController2D>();
             if (pc != null) playerObj = pc.gameObject;
         }
 
@@ -119,13 +124,20 @@ public class RuntimeStoryDirector : MonoBehaviour
 
     void UpdateObjective(int beatIndex)
     {
-        if (beatIndex < beats.Length - 1)
+        switch (beatIndex)
         {
-            currentObjective = $"Objetivo: Sigue avanzando al este. Próximo punto en X={beats[beatIndex + 1].triggerX:0}.";
-        }
-        else
-        {
-            currentObjective = "Objetivo cumplido: Sector explorado. Próxima fase: torre central.";
+            case 0:
+                currentObjective = "Objetivo: Supera la Zona A y aprende el flujo del sector mientras limpias los primeros archivos infectados.";
+                break;
+            case 1:
+                currentObjective = "Objetivo: Activa el Terminal de Reparacion 1 y cruza los platos giratorios sin caer en sectores dañados.";
+                break;
+            case 2:
+                currentObjective = "Objetivo: Recorre el Corredor de Carpetas Corrompidas y encuentra la carpeta oculta FOTO_ANTIGUA.png.";
+                break;
+            default:
+                currentObjective = "Objetivo cumplido: Disco Duro estabilizado. Proximo destino: Memoria RAM.";
+                break;
         }
 
         Debug.Log("[Historia] " + currentObjective);
@@ -138,10 +150,21 @@ public class RuntimeStoryDirector : MonoBehaviour
         var style = new GUIStyle(GUI.skin.box)
         {
             alignment = TextAnchor.MiddleLeft,
-            fontSize = 14,
+            fontSize = 24,
             normal = { textColor = Color.white }
         };
 
-        GUI.Box(new Rect(12, 12, 520, 36), currentObjective, style);
+        style.padding = new RectOffset(18, 18, 8, 8);
+
+        // Reservar el bloque inferior izquierdo para el HUD principal.
+        float hudSafeLeft = 580f;
+        float minRightMargin = 16f;
+
+        float width = Mathf.Clamp(Screen.width - hudSafeLeft - minRightMargin, 320f, 1200f);
+        float height = 56f;
+        float x = Mathf.Max(hudSafeLeft, Screen.width - width - minRightMargin);
+        float y = Screen.height - height - 18f;
+
+        GUI.Box(new Rect(x, y, width, height), currentObjective, style);
     }
 }

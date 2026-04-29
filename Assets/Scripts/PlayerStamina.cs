@@ -6,8 +6,8 @@ public class PlayerStamina : MonoBehaviour
     [Header("Stamina")]
     public float maxStamina = 100f;
     public float currentStamina;
-    public float regenPerSecond = 22f;
-    public float regenDelayAfterUse = 0.45f;
+    public float regenPerSecond = 7f;
+    public float regenDelayAfterUse = 2.5f;
 
     public event Action<float, float> OnStaminaChanged; // current, max
 

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Cámara que sigue al jugador con suavizado.
@@ -24,34 +25,38 @@ public class CameraFollow : MonoBehaviour
     public float minY = -100f, maxY = 100f;
 
     // ── Auto-instalación ────────────────────────────────────
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void AutoInstall()
     {
-        var cam = Camera.main;
-        if (cam == null) return;
-
-        // Si ya tiene CameraFollow, no hacer nada
-        if (cam.GetComponent<CameraFollow>() != null) return;
-
-        var cf = cam.gameObject.AddComponent<CameraFollow>();
-
-        // Buscar jugador
-        var playerObj = GameObject.FindWithTag("Player");
-        if (playerObj == null)
+        SceneManager.sceneLoaded += (scene, _) =>
         {
-            var pc = FindAnyObjectByType<PlayerController2D>();
-            if (pc != null) playerObj = pc.gameObject;
-        }
+            if (!GameSceneConfig.IsCombatInputScene(scene.name)) return;
+            var cam = Camera.main;
+            if (cam == null) return;
 
-        if (playerObj != null)
-        {
-            cf.target = playerObj.transform;
-            Debug.Log("[CameraFollow] Auto-instalado siguiendo a: " + playerObj.name);
-        }
-        else
-        {
-            Debug.LogWarning("[CameraFollow] No se encontró el jugador para seguir.");
-        }
+            // Si ya tiene CameraFollow, no hacer nada
+            if (cam.GetComponent<CameraFollow>() != null) return;
+
+            var cf = cam.gameObject.AddComponent<CameraFollow>();
+
+            // Buscar jugador
+            var playerObj = GameObject.FindWithTag("Player");
+            if (playerObj == null)
+            {
+                var pc = FindAnyObjectByType<PlayerController2D>();
+                if (pc != null) playerObj = pc.gameObject;
+            }
+
+            if (playerObj != null)
+            {
+                cf.target = playerObj.transform;
+                Debug.Log("[CameraFollow] Auto-instalado siguiendo a: " + playerObj.name);
+            }
+            else
+            {
+                Debug.LogWarning("[CameraFollow] No se encontró el jugador para seguir.");
+            }
+        };
     }
 
     // ── Shake ────────────────────────────────────────────────────
@@ -70,8 +75,6 @@ public class CameraFollow : MonoBehaviour
     {
         if (target == null) return;
 
-        // Si el juego está pausado por NarrativeUI, no mover la cámara
-        if (NarrativeUI.IsGamePaused) return;
 
         Vector3 desired = target.position + offset;
         desired.z = transform.position.z;   // mantener profundidad de cámara

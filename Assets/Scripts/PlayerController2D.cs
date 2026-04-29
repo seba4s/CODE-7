@@ -24,7 +24,7 @@ public class PlayerController2D : MonoBehaviour
     bool isGrounded;
     bool isTouchingWall;
     bool wallOnRight;
-    bool hasDoubleJump; // luego lo conectamos a progreso
+    bool hasDoubleJump = true;  // activo desde el inicio
     bool usedDoubleJump;
 
     /// <summary>Expone el estado de suelo para que PlayerVFX pueda detectar saltos/aterrizajes.</summary>
@@ -49,14 +49,6 @@ public class PlayerController2D : MonoBehaviour
 
     void Update()
     {
-        // No procesar input si el juego está pausado por NarrativeUI
-        if (NarrativeUI.IsGamePaused)
-        {
-            // Detener el personaje completamente mientras el mensaje está visible
-            if (rb != null) rb.linearVelocity = Vector2.zero;
-            return;
-        }
-
         // Ground check
         Vector2 checkPos = groundCheck != null ? (Vector2)groundCheck.position : (Vector2)transform.position;
         isGrounded = Physics2D.OverlapCircle(checkPos, groundCheckRadius, groundMask);

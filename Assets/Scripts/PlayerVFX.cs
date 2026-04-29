@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Efectos visuales cyberpunk del personaje:
@@ -44,14 +45,18 @@ public class PlayerVFX : MonoBehaviour
     const float AfterimageInterval = 0.045f;
 
     // ── Auto-instalación ──────────────────────────────────────────
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void AutoInstall()
     {
-        var pc = FindAnyObjectByType<PlayerController2D>();
-        if (pc == null) return;
-        if (pc.GetComponent<PlayerVFX>() != null) return;
-        pc.gameObject.AddComponent<PlayerVFX>();
-        Debug.Log("[PlayerVFX] Auto-instalado.");
+        SceneManager.sceneLoaded += (scene, _) =>
+        {
+            if (!GameSceneConfig.IsCombatInputScene(scene.name)) return;
+            var pc = FindAnyObjectByType<PlayerController2D>();
+            if (pc == null) return;
+            if (pc.GetComponent<PlayerVFX>() != null) return;
+            pc.gameObject.AddComponent<PlayerVFX>();
+            Debug.Log("[PlayerVFX] Auto-instalado.");
+        };
     }
 
     // ── Awake ─────────────────────────────────────────────────────
@@ -162,12 +167,6 @@ public class PlayerVFX : MonoBehaviour
     // ── Update ────────────────────────────────────────────────────
     void Update()
     {
-        if (NarrativeUI.IsGamePaused)
-        {
-            trail.emitting = false;
-            return;
-        }
-
         bool isDashing  = dash != null && dash.IsDashing;
         bool isGrounded = controller != null
             ? controller.IsGrounded
