@@ -60,8 +60,27 @@ public static class GameInput
 
     public static bool GetJumpDown()
     {
-        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame) return true;
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.spaceKey.wasPressedThisFrame) return true;
+            if (Keyboard.current.wKey.wasPressedThisFrame)     return true;
+            if (Keyboard.current.upArrowKey.wasPressedThisFrame) return true;
+        }
         if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame) return true;
+        return false;
+    }
+
+    public static bool GetSecondaryFireHeld()
+    {
+        if (Mouse.current != null && Mouse.current.rightButton.isPressed) return true;
+        if (Gamepad.current != null && Gamepad.current.leftTrigger.ReadValue() > 0.5f) return true;
+        return false;
+    }
+
+    public static bool GetSecondaryFireUp()
+    {
+        if (Mouse.current != null && Mouse.current.rightButton.wasReleasedThisFrame) return true;
+        if (Gamepad.current != null && Gamepad.current.leftTrigger.wasReleasedThisFrame) return true;
         return false;
     }
 

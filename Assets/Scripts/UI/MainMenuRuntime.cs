@@ -1,13 +1,11 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
-/// <summary>
-/// Construye el menú principal completamente por código.
-/// Añade este componente a un GameObject vacío en la escena "MainMenu".
-/// </summary>
 public class MainMenuRuntime : MonoBehaviour
 {
     Button newGameButton;
@@ -15,6 +13,8 @@ public class MainMenuRuntime : MonoBehaviour
     Button upgradesButton;
     Button optionsButton;
     Button quitButton;
+
+    RenderTexture bgRenderTexture;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void AutoInstall()
@@ -45,6 +45,15 @@ public class MainMenuRuntime : MonoBehaviour
         TryInvokeManual(quitButton, OnQuitClicked);
     }
 
+    void OnDestroy()
+    {
+        if (bgRenderTexture != null)
+        {
+            bgRenderTexture.Release();
+            Destroy(bgRenderTexture);
+        }
+    }
+
     void BuildMenu()
     {
         EnsureEventSystem();
@@ -54,30 +63,47 @@ public class MainMenuRuntime : MonoBehaviour
         var canvas = canvasGO.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 100;
-        canvasGO.AddComponent<CanvasScaler>().uiScaleMode =
-            CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        canvasGO.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1920, 1080);
+        var scaler = canvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
         canvasGO.AddComponent<GraphicRaycaster>();
 
-        // ── Fondo ────────────────────────────────────────────────
-        var bg = CreatePanel(canvasGO.transform, "Background",
-            new Color(0.05f, 0.05f, 0.1f, 1f));
-        Stretch(bg);
+        // ── Fondo con video en bucle ─────────────────────────────
+        var bgGO = new GameObject("Background");
+        bgGO.transform.SetParent(canvasGO.transform, false);
+        Stretch(bgGO);
 
-        var bgImage = bg.GetComponent<Image>();
-        var backgroundSprite = LoadSpriteFromResources("UI/MainMenu/fondo juego");
-        if (backgroundSprite != null)
+        bgRenderTexture = new RenderTexture(1920, 1080, 0);
+
+        var rawImg = bgGO.AddComponent<RawImage>();
+        rawImg.color = Color.white;
+        rawImg.texture = bgRenderTexture;
+
+        var videoPlayer = bgGO.AddComponent<VideoPlayer>();
+        videoPlayer.renderMode = VideoRenderMode.RenderTexture;
+        videoPlayer.targetTexture = bgRenderTexture;
+        videoPlayer.isLooping = true;
+        videoPlayer.playOnAwake = false;
+        videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+
+        var videoClip = Resources.Load<VideoClip>("UI/MainMenu/fondo");
+        if (videoClip != null)
         {
-            bgImage.sprite = backgroundSprite;
-            bgImage.color = Color.white;
-            bgImage.type = Image.Type.Simple;
-            bgImage.preserveAspect = false;
+            videoPlayer.clip = videoClip;
+            videoPlayer.Play();
+        }
+        else
+        {
+            rawImg.color = new Color(0.05f, 0.05f, 0.1f, 1f);
+            Debug.LogWarning("MainMenuRuntime: no se encontró fondo.mp4 en Resources/UI/MainMenu/");
         }
 
+        // ── Logo ─────────────────────────────────────────────────
         var logoSprite = LoadSpriteFromResources("UI/MainMenu/menu codex recovered");
         if (logoSprite != null)
         {
-            var logo = CreateImage(bg.transform, "GameLogo", logoSprite, true);
+            var logo = CreateImage(bgGO.transform, "GameLogo", logoSprite, true);
             var logoRect = logo.GetComponent<RectTransform>();
             logoRect.anchorMin = logoRect.anchorMax = new Vector2(0.5f, 0.86f);
             logoRect.anchoredPosition = new Vector2(0f, 10f);
@@ -85,28 +111,29 @@ public class MainMenuRuntime : MonoBehaviour
         }
 
         // ── Grupo de botones ─────────────────────────────────────
+        // Altura disponible: (0.77 - 0.01) * 1080 = 820px
+        // 5 botones × 155px + 4 gaps × 4px + padding 4+4 = 811px — cabe justo
         var panel = new GameObject("ButtonsGroup");
-        panel.transform.SetParent(bg.transform, false);
+        panel.transform.SetParent(bgGO.transform, false);
         var panelRect = panel.AddComponent<RectTransform>();
-        panelRect.anchorMin = new Vector2(0.37f, 0.24f);
-        panelRect.anchorMax = new Vector2(0.63f, 0.56f);
+        panelRect.anchorMin = new Vector2(0.18f, 0.01f);
+        panelRect.anchorMax = new Vector2(0.82f, 0.77f);
         panelRect.offsetMin = panelRect.offsetMax = Vector2.zero;
 
-        // Layout vertical automático
         var layout = panel.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.spacing = 16f;
-        layout.padding = new RectOffset(40, 40, 40, 40);
+        layout.spacing = 4f;
+        layout.padding = new RectOffset(10, 10, 4, 4);
         layout.childControlWidth = false;
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
 
         // ── Botones ──────────────────────────────────────────────
-        newGameButton = CreateImageMenuButton(panel.transform, "NuevaPartida", "nueva partida", OnNewGameClicked);
-        continueButton = CreateImageMenuButton(panel.transform, "Continuar", "continuar", OnContinueClicked);
-        upgradesButton = CreateImageMenuButton(panel.transform, "Mejoras", "mejoras", OnUpgradesClicked);
-        optionsButton = CreateImageMenuButton(panel.transform, "Opciones", "opciones", OnOptionsClicked);
-        quitButton = CreateImageMenuButton(panel.transform, "Salir", "salir", OnQuitClicked);
+        newGameButton  = CreateImageMenuButton(panel.transform, "NuevaPartida", "nuevaPartida", OnNewGameClicked);
+        continueButton = CreateImageMenuButton(panel.transform, "Continuar",    "Continuar",    OnContinueClicked);
+        upgradesButton = CreateImageMenuButton(panel.transform, "Mejoras",      "Mejoras",      OnUpgradesClicked);
+        optionsButton  = CreateImageMenuButton(panel.transform, "Opciones",     "Opciones",     OnOptionsClicked);
+        quitButton     = CreateImageMenuButton(panel.transform, "Salir",        "salir",        OnQuitClicked);
     }
 
     // ── Callbacks ────────────────────────────────────────────────
@@ -127,7 +154,6 @@ public class MainMenuRuntime : MonoBehaviour
 
     void OnUpgradesClicked()
     {
-        // Placeholder until an upgrades scene/system is added.
         Debug.Log("Mejoras: aun no implementado.");
     }
 
@@ -149,37 +175,13 @@ public class MainMenuRuntime : MonoBehaviour
 
     // ── Helpers de UI ────────────────────────────────────────────
 
-    GameObject CreatePanel(Transform parent, string name, Color color)
-    {
-        var go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-        var img = go.AddComponent<Image>();
-        img.color = color;
-        return go;
-    }
-
     void Stretch(GameObject go)
     {
         var rt = go.GetComponent<RectTransform>();
+        if (rt == null) rt = go.AddComponent<RectTransform>();
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.offsetMin = rt.offsetMax = Vector2.zero;
-    }
-
-    GameObject CreateText(Transform parent, string name, string content,
-        int size, Color color, FontStyle style = FontStyle.Normal)
-    {
-        var go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-        var txt = go.AddComponent<Text>();
-        txt.text = content;
-        txt.fontSize = size;
-        txt.color = color;
-        txt.fontStyle = style;
-        txt.alignment = TextAnchor.MiddleCenter;
-        txt.font = GetUIFont();
-        go.AddComponent<LayoutElement>();
-        return go;
     }
 
     GameObject CreateImage(Transform parent, string name, Sprite sprite, bool preserveAspect)
@@ -200,36 +202,33 @@ public class MainMenuRuntime : MonoBehaviour
         go.transform.SetParent(parent, false);
 
         var le = go.AddComponent<LayoutElement>();
-        le.preferredWidth = 620f;
-        le.preferredHeight = 110f;
-        le.minHeight = 90f;
+        le.preferredWidth  = 920f;
+        le.preferredHeight = 155f;
+        le.minHeight       = 155f;
 
         var img = go.AddComponent<Image>();
         img.color = Color.white;
         img.sprite = LoadMenuSprite(resourceSpriteName);
-        img.preserveAspect = true;
+        img.preserveAspect = false;
 
-        if (img.sprite != null)
-        {
-            float aspect = img.sprite.rect.width / img.sprite.rect.height;
-            le.preferredHeight = le.preferredWidth / Mathf.Max(aspect, 0.01f);
-            le.minHeight = le.preferredHeight;
-        }
-        else
-        {
+        if (img.sprite == null)
             img.color = new Color(0.15f, 0.15f, 0.2f, 1f);
-        }
 
+        // ColorBlock: normalColor ligeramente oscuro para que el hover se vea más brillante
         var btn = go.AddComponent<Button>();
-
         var colors = btn.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(0.92f, 0.92f, 0.92f, 1f);
-        colors.pressedColor = new Color(0.78f, 0.78f, 0.78f, 1f);
-        colors.selectedColor = colors.normalColor;
+        colors.normalColor      = new Color(0.80f, 0.80f, 0.80f, 1f);
+        colors.highlightedColor = Color.white;
+        colors.pressedColor     = new Color(0.65f, 0.65f, 0.65f, 1f);
+        colors.selectedColor    = colors.normalColor;
+        colors.fadeDuration     = 0.1f;
         btn.colors = colors;
 
         btn.onClick.AddListener(onClick);
+
+        // Overlay de brillo animado en hover
+        go.AddComponent<ButtonGlow>();
+
         return btn;
     }
 
@@ -250,13 +249,6 @@ public class MainMenuRuntime : MonoBehaviour
             100f);
     }
 
-    static Font GetUIFont()
-    {
-        var f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (f == null) f = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        return f;
-    }
-
     static Sprite LoadSpriteFromResources(string resourcePath)
     {
         var texture = Resources.Load<Texture2D>(resourcePath);
@@ -269,10 +261,7 @@ public class MainMenuRuntime : MonoBehaviour
                 100f);
         }
 
-        var sprite = Resources.Load<Sprite>(resourcePath);
-        if (sprite != null) return sprite;
-
-        return null;
+        return Resources.Load<Sprite>(resourcePath);
     }
 
     static Vector2 GetFittedSize(Sprite sprite, float maxWidth, float maxHeight)
@@ -281,13 +270,13 @@ public class MainMenuRuntime : MonoBehaviour
             return new Vector2(maxWidth, maxHeight);
 
         float aspect = sprite.rect.width / sprite.rect.height;
-        float width = maxWidth;
+        float width  = maxWidth;
         float height = width / aspect;
 
         if (height > maxHeight)
         {
             height = maxHeight;
-            width = height * aspect;
+            width  = height * aspect;
         }
 
         return new Vector2(width, height);
@@ -309,5 +298,50 @@ public class MainMenuRuntime : MonoBehaviour
         if (rect == null) return;
         if (!RectTransformUtility.RectangleContainsScreenPoint(rect, GameInput.GetPointerPosition(), null)) return;
         action?.Invoke();
+    }
+}
+
+// ── Efecto de brillo al pasar el mouse ───────────────────────────
+public class ButtonGlow : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+{
+    Image overlay;
+    Coroutine tween;
+
+    static readonly Color GlowOn  = new Color(1f, 1f, 0.85f, 0.22f);
+    static readonly Color GlowOff = new Color(1f, 1f, 0.85f, 0f);
+
+    void Awake()
+    {
+        var child = new GameObject("GlowOverlay");
+        child.transform.SetParent(transform, false);
+        var rt = child.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+        overlay = child.AddComponent<Image>();
+        overlay.color = GlowOff;
+        overlay.raycastTarget = false;
+    }
+
+    public void OnPointerEnter(PointerEventData _) => AnimateTo(GlowOn);
+    public void OnPointerExit(PointerEventData _)  => AnimateTo(GlowOff);
+
+    void AnimateTo(Color target)
+    {
+        if (tween != null) StopCoroutine(tween);
+        tween = StartCoroutine(Lerp(target));
+    }
+
+    IEnumerator Lerp(Color target)
+    {
+        var start = overlay.color;
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.unscaledDeltaTime * 8f;
+            overlay.color = Color.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+            yield return null;
+        }
+        overlay.color = target;
     }
 }

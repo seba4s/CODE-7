@@ -61,32 +61,58 @@ public class RuntimeMapBuilder : MonoBehaviour
 
     void BuildTutorialSlice(Transform root, int groundLayer)
     {
-        // Suelo principal continuo
-        CreateBlock(root, "MainGround", new Vector2((startX + endX) * 0.5f, groundY - 0.6f), new Vector2(endX - startX, 2.4f), groundLayer, groundColor, 0);
+        // ── Suelo principal (toda la longitud del tutorial) ────────────────
+        // groundY = -1.8  →  block center at -2.4, height 2.4, top at -1.2
+        CreateBlock(root, "MainGround",
+            new Vector2(84f, groundY - 0.6f),
+            new Vector2(178f, 2.4f), groundLayer, groundColor, 0);
 
-        // Bases (pequeñas plataformas grandes)
-        CreateBlock(root, "Base_A", new Vector2(10f, 0.4f), new Vector2(8f, 0.8f), groundLayer, platformColor, 1);
-        CreateBlock(root, "Base_B", new Vector2(28f, 1.2f), new Vector2(7f, 0.8f), groundLayer, platformColor, 1);
-        CreateBlock(root, "Base_C", new Vector2(46f, 2.1f), new Vector2(9f, 0.8f), groundLayer, platformColor, 1);
-        CreateBlock(root, "Base_D", new Vector2(70f, 1.5f), new Vector2(10f, 0.8f), groundLayer, platformColor, 1);
-        CreateBlock(root, "Base_E", new Vector2(96f, 2.6f), new Vector2(12f, 0.8f), groundLayer, platformColor, 1);
+        // Pared de inicio (impide retroceder)
+        CreateBlock(root, "StartWall",
+            new Vector2(-5.5f, 1.5f), new Vector2(1f, 6f), groundLayer, groundColor, 0);
 
-        // Ruta de salto progresiva a la derecha
-        CreateBlock(root, "Jump_01", new Vector2(16f, 2.6f), new Vector2(3.2f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_02", new Vector2(21f, 3.8f), new Vector2(3.2f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_03", new Vector2(26f, 5.0f), new Vector2(3.2f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_04", new Vector2(35f, 3.4f), new Vector2(3.5f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_05", new Vector2(40f, 4.7f), new Vector2(3.5f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_06", new Vector2(54f, 5.6f), new Vector2(4f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_07", new Vector2(61f, 4.1f), new Vector2(4f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_08", new Vector2(77f, 3.6f), new Vector2(4.2f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_09", new Vector2(85f, 5.0f), new Vector2(4.2f, 0.55f), groundLayer, platformColor, 2);
-        CreateBlock(root, "Jump_10", new Vector2(107f, 4.2f), new Vector2(4.5f, 0.55f), groundLayer, platformColor, 2);
+        // ── ZONA 3 – SALTO 1 (plataforma baja, x≈18-26) ───────────────────
+        // center (22, 0.0), height 0.8  →  top y = 0.4
+        CreateBlock(root, "Plat_Jump1",
+            new Vector2(22f, 0.0f), new Vector2(5f, 0.8f), groundLayer, platformColor, 1);
 
-        // Estructuras verticales (sensación de base/ruina)
-        CreateBlock(root, "Tower_A", new Vector2(32f, 0.8f), new Vector2(1.3f, 4f), groundLayer, groundColor, 0);
-        CreateBlock(root, "Tower_B", new Vector2(58f, 0.9f), new Vector2(1.3f, 5f), groundLayer, groundColor, 0);
-        CreateBlock(root, "Tower_C", new Vector2(90f, 1.0f), new Vector2(1.3f, 6f), groundLayer, groundColor, 0);
+        // ── ZONA 4 – SALTO 2 (plataforma alta, x≈29-37) ───────────────────
+        // center (33, 1.0), height 0.8  →  top y = 1.4
+        CreateBlock(root, "Plat_Jump2",
+            new Vector2(33f, 1.0f), new Vector2(5f, 0.8f), groundLayer, platformColor, 1);
+
+        // Descenso suave desde plataforma 2
+        CreateBlock(root, "Plat_Drop",
+            new Vector2(39.5f, 0.15f), new Vector2(4f, 0.5f), groundLayer, platformColor, 1);
+
+        // ── ZONA 6 – ARENA COMBATE 1 (x: 62–86) ───────────────────────────
+        CreateBlock(root, "ArenaWall_L1",
+            new Vector2(62f, 2f), new Vector2(1f, 7f), groundLayer, groundColor, 0);
+        CreateBlock(root, "ArenaWall_R1",
+            new Vector2(86f, 2f), new Vector2(1f, 7f), groundLayer, groundColor, 0);
+
+        // ── ZONA 11 – ARENA COMBATE 2 (x: 134–162) ───────────────────────
+        CreateBlock(root, "ArenaWall_L2",
+            new Vector2(134f, 3f), new Vector2(1f, 9f), groundLayer, groundColor, 0);
+        CreateBlock(root, "ArenaWall_R2",
+            new Vector2(162f, 3f), new Vector2(1f, 9f), groundLayer, groundColor, 0);
+        // Plataformas internas para dinamismo vertical
+        CreateBlock(root, "Arena2_Plat1",
+            new Vector2(142f, 1.2f), new Vector2(4f, 0.55f), groundLayer, platformColor, 2);
+        CreateBlock(root, "Arena2_Plat2",
+            new Vector2(151f, 2.5f), new Vector2(4f, 0.55f), groundLayer, platformColor, 2);
+        CreateBlock(root, "Arena2_Plat3",
+            new Vector2(158f, 1.2f), new Vector2(4f, 0.55f), groundLayer, platformColor, 2);
+
+        // ── Labels de zona (guías visuales en el mundo) ───────────────────
+        CreateWorldLabel(root, "ZONA: MOVIMIENTO",   new Vector2( 7f,  0.5f), new Color(0.5f, 1f, 0.5f, 0.55f));
+        CreateWorldLabel(root, "↑ SALTO",            new Vector2(22f,  2.0f), new Color(1f, 0.95f, 0.4f, 0.65f));
+        CreateWorldLabel(root, "↑↑ SALTO 2",         new Vector2(33f,  3.0f), new Color(1f, 0.95f, 0.4f, 0.65f));
+        CreateWorldLabel(root, "ZONA: DASH",         new Vector2(52f,  0.5f), new Color(0.4f, 0.9f, 1f, 0.55f));
+        CreateWorldLabel(root, "ZONA: COMBATE",      new Vector2(74f,  3.5f), new Color(1f, 0.4f, 0.4f, 0.45f));
+        CreateWorldLabel(root, "ZONA: PULSO",        new Vector2(92f,  0.5f), new Color(0.4f, 1f, 0.9f, 0.55f));
+        CreateWorldLabel(root, "ZONA: DATOS",        new Vector2(108f, 0.5f), new Color(0.3f, 0.8f, 1f, 0.55f));
+        CreateWorldLabel(root, "ZONA: COMBATE II",   new Vector2(148f, 4.5f), new Color(1f, 0.4f, 0.4f, 0.45f));
     }
 
     void BuildHardDriveSector(Transform root, int groundLayer)
