@@ -57,7 +57,7 @@ public class Level1RepairTerminal : MonoBehaviour
     void Update()
     {
         if (!playerInside || activated) return;
-        if (!Input.GetKeyDown(KeyCode.E)) return;
+        if (!GameInput.GetKeyDown(KeyCode.E)) return;
         if (Level1MissionDirector.Instance == null) return;
 
         activated = true;
@@ -97,7 +97,7 @@ public class Level1ExitPort : MonoBehaviour
     void Update()
     {
         if (!playerInside || completed) return;
-        if (!Input.GetKeyDown(KeyCode.E)) return;
+        if (!GameInput.GetKeyDown(KeyCode.E)) return;
         if (Level1MissionDirector.Instance == null) return;
 
         if (!Level1MissionDirector.Instance.ExitUnlocked)

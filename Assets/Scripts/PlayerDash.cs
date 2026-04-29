@@ -40,15 +40,15 @@ public class PlayerDash : MonoBehaviour
 
     void Update()
     {
-        float x = Input.GetAxisRaw("Horizontal");
+        float x = GameInput.GetMoveXRaw();
         if (x > 0.01f) lastNonZeroDir = Vector2.right;
         else if (x < -0.01f) lastNonZeroDir = Vector2.left;
 
         if (!isDashing)
         {
-            if (dashOnShiftWithDirection && Input.GetKeyDown(dashKey))
+            if (dashOnShiftWithDirection && GameInput.GetKeyDown(dashKey))
             {
-                float heldX = Input.GetAxisRaw("Horizontal");
+                float heldX = GameInput.GetMoveXRaw();
                 if (heldX > 0.01f) TryStartDash(Vector2.right);
                 else if (heldX < -0.01f) TryStartDash(Vector2.left);
                 else TryStartDash(lastNonZeroDir);

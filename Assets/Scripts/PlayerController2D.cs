@@ -9,6 +9,9 @@ public class PlayerController2D : MonoBehaviour
     [Header("Wall")]
     public float wallCheckDistance = 0.25f;
     public float wallFallSpeed = 2.5f;
+    public float wallJumpHorizontalSpeed = 8f;
+    public float wallJumpVerticalMultiplier = 1.05f;
+    public float wallJumpControlLockDuration = 0.12f;
     public bool applyZeroFrictionMaterial = true;
 
     [Header("Jump")]
@@ -26,6 +29,7 @@ public class PlayerController2D : MonoBehaviour
     bool wallOnRight;
     bool hasDoubleJump = true;  // activo desde el inicio
     bool usedDoubleJump;
+    float wallJumpControlLockUntil;
 
     /// <summary>Expone el estado de suelo para que PlayerVFX pueda detectar saltos/aterrizajes.</summary>
     public bool IsGrounded => isGrounded;
@@ -59,25 +63,32 @@ public class PlayerController2D : MonoBehaviour
         // Horizontal move (no sobrescribir velocidad durante dash)
         if (dash == null || !dash.IsDashing)
         {
-            float x = Input.GetAxisRaw("Horizontal");
+            if (Time.time >= wallJumpControlLockUntil)
+            {
+                float x = GameInput.GetMoveXRaw();
 
-            // Anti-wall-stick: si empujas hacia la pared en el aire, no te quedas pegado.
-            if (!isGrounded && isTouchingWall && ((wallOnRight && x > 0f) || (!wallOnRight && x < 0f)))
-            {
-                rb.linearVelocity = new Vector2(0f, Mathf.Min(rb.linearVelocity.y, -wallFallSpeed));
-            }
-            else
-            {
-            rb.linearVelocity = new Vector2(x * moveSpeed, rb.linearVelocity.y);
+                // Anti-wall-stick: si empujas hacia la pared en el aire, no te quedas pegado.
+                if (!isGrounded && isTouchingWall && ((wallOnRight && x > 0f) || (!wallOnRight && x < 0f)))
+                {
+                    rb.linearVelocity = new Vector2(0f, Mathf.Min(rb.linearVelocity.y, -wallFallSpeed));
+                }
+                else
+                {
+                    rb.linearVelocity = new Vector2(x * moveSpeed, rb.linearVelocity.y);
+                }
             }
         }
 
         // Jump
-        if (Input.GetButtonDown("Jump"))
+        if (GameInput.GetJumpDown())
         {
             if (isGrounded)
             {
                 Jump();
+            }
+            else if (isTouchingWall)
+            {
+                WallJump();
             }
             else if (hasDoubleJump && !usedDoubleJump)
             {
@@ -94,6 +105,17 @@ public class PlayerController2D : MonoBehaviour
         float jumpVel = Mathf.Sqrt(2f * g * jumpHeight);
 
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpVel);
+    }
+
+    void WallJump()
+    {
+        float g = Mathf.Abs(Physics2D.gravity.y) * rb.gravityScale;
+        float jumpVel = Mathf.Sqrt(2f * g * jumpHeight) * wallJumpVerticalMultiplier;
+        float horizontalDir = wallOnRight ? -1f : 1f;
+
+        rb.linearVelocity = new Vector2(horizontalDir * wallJumpHorizontalSpeed, jumpVel);
+        wallJumpControlLockUntil = Time.time + wallJumpControlLockDuration;
+        usedDoubleJump = false;
     }
 
     // Llamarás a esto cuando desbloquees doble salto por historia

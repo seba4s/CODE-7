@@ -246,7 +246,7 @@ public class TutorialOverlayRuntime : MonoBehaviour
         le.minHeight = 80f;
         le.preferredWidth = 600f;
         var img = go.AddComponent<Image>();
-        img.color = bgColor;
+        UIRuntimeStyle.ApplyRoundedButtonStyle(img, bgColor);
         var btn = go.AddComponent<Button>();
         var colors = btn.colors;
         colors.highlightedColor = new Color(

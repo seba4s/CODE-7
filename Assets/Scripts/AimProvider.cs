@@ -12,7 +12,7 @@ public class AimProvider : MonoBehaviour
 
     void Update()
     {
-        Vector3 mouse = Input.mousePosition;
+        Vector3 mouse = GameInput.GetPointerPosition();
         Vector3 world = cam.ScreenToWorldPoint(mouse);
         Vector2 dir = (Vector2)(world - transform.position);
 

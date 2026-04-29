@@ -54,7 +54,7 @@ public class Level1MissionDirector : MonoBehaviour
     {
         if (!waitingForContinue) return;
 
-        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
+        if (GameInput.GetInteractDown())
             ContinueToNextLevel();
     }
 

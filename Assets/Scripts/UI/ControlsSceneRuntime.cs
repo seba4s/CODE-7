@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -73,14 +74,14 @@ public class ControlsSceneRuntime : MonoBehaviour
         // ── Franja de botón (inferior fija) ────────────────────
         var footer = MakeRect(bg.transform, "Footer");
         var fRT = footer.GetComponent<RectTransform>();
-        fRT.anchorMin = new Vector2(0.3f, 0f);
-        fRT.anchorMax = new Vector2(0.7f, 0f);
+        fRT.anchorMin = new Vector2(0.34f, 0f);
+        fRT.anchorMax = new Vector2(0.66f, 0f);
         fRT.pivot     = new Vector2(0.5f, 0f);
         fRT.anchoredPosition = new Vector2(0f, 24f);
-        fRT.sizeDelta = new Vector2(0f, 70f);
+        fRT.sizeDelta = new Vector2(0f, 78f);
 
         var backBtn = footer.AddComponent<Image>();
-        backBtn.color = new Color(0.2f, 0.4f, 0.75f, 1f);
+        UIRuntimeStyle.ApplyRoundedButtonStyle(backBtn, new Color(0.2f, 0.4f, 0.75f, 1f));
         var btn = footer.AddComponent<Button>();
         var colors = btn.colors;
         colors.highlightedColor = new Color(0.35f, 0.55f, 0.95f);
@@ -92,45 +93,26 @@ public class ControlsSceneRuntime : MonoBehaviour
             Color.white, FontStyle.Bold);
         Stretch(btnTxt);
 
-        // ── Área de scroll (entre header y footer) ─────────────
-        var scrollArea = MakeRect(bg.transform, "ScrollArea");
-        var saRT = scrollArea.GetComponent<RectTransform>();
-        saRT.anchorMin = new Vector2(0.05f, 0f);
-        saRT.anchorMax = new Vector2(0.95f, 1f);
-        saRT.offsetMin = new Vector2(0f,  120f);  // encima del footer
-        saRT.offsetMax = new Vector2(0f, -130f);  // debajo del header
+        // ── Área de contenido (entre header y footer) ──────────
+        var contentFrame = MakeRect(bg.transform, "ContentFrame");
+        var frameRT = contentFrame.GetComponent<RectTransform>();
+        frameRT.anchorMin = new Vector2(0.09f, 0f);
+        frameRT.anchorMax = new Vector2(0.91f, 1f);
+        frameRT.offsetMin = new Vector2(0f, 122f);
+        frameRT.offsetMax = new Vector2(0f, -150f);
 
-        var scrollRect = scrollArea.AddComponent<ScrollRect>();
-        scrollRect.horizontal     = false;
-        scrollRect.vertical       = true;
-        scrollRect.scrollSensitivity = 30f;
-        scrollRect.movementType   = ScrollRect.MovementType.Clamped;
+        var frameImage = contentFrame.AddComponent<Image>();
+        frameImage.sprite = UIRuntimeStyle.GetRoundedPanelSprite();
+        frameImage.type = Image.Type.Sliced;
+        frameImage.color = new Color(0.05f, 0.07f, 0.14f, 0.82f);
 
-        // Viewport
-        var viewport = MakeRect(scrollArea.transform, "Viewport");
-        Stretch(viewport);
-        viewport.AddComponent<Image>().color = Color.clear;
-        viewport.AddComponent<Mask>().showMaskGraphic = false;
-        scrollRect.viewport = viewport.GetComponent<RectTransform>();
-
-        // Content (crece verticalmente con el contenido)
-        var content = MakeRect(viewport.transform, "Content");
-        var cRT = content.GetComponent<RectTransform>();
-        cRT.anchorMin = new Vector2(0f, 1f);
-        cRT.anchorMax = new Vector2(1f, 1f);
-        cRT.pivot     = new Vector2(0.5f, 1f);
-        cRT.anchoredPosition = Vector2.zero;
-        cRT.sizeDelta = new Vector2(0f, 0f);
-        scrollRect.content = cRT;
-
-        var csf = content.AddComponent<ContentSizeFitter>();
-        csf.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
-        csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        var content = MakeRect(contentFrame.transform, "Content");
+        Stretch(content);
 
         var vl = content.AddComponent<VerticalLayoutGroup>();
         vl.childAlignment     = TextAnchor.UpperCenter;
         vl.spacing            = 12f;
-        vl.padding            = new RectOffset(60, 60, 30, 30);
+        vl.padding            = new RectOffset(60, 60, 34, 34);
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
@@ -159,12 +141,6 @@ public class ControlsSceneRuntime : MonoBehaviour
             "Shift  +  ← / →",
             "Impulso rápido. Invulnerable mientras dura. Consume estamina.");
 
-        AddSpacer(content.transform, 16f);
-        AddSectionTitle(content.transform, "CONSEJOS", new Color(0.5f, 1f, 0.6f));
-        AddTip(content.transform, "El dash te vuelve invulnerable durante un instante.");
-        AddTip(content.transform, "La estamina se regenera sola con el tiempo.");
-        AddTip(content.transform, "Mueres si tu salud llega a 0 — reapareces en el último punto de control.");
-
         AddSpacer(content.transform, 20f);
     }
 
@@ -180,8 +156,7 @@ public class ControlsSceneRuntime : MonoBehaviour
 
     void AddControlRow(Transform parent, string action, string keys, string desc)
     {
-        var row = new GameObject("Row_" + action);
-        row.transform.SetParent(parent, false);
+        var row = MakeRect(parent, "Row_" + action);
         var le = row.AddComponent<LayoutElement>();
         le.minHeight        = 64f;
         le.preferredHeight  = 64f;
@@ -198,8 +173,7 @@ public class ControlsSceneRuntime : MonoBehaviour
         hl.childForceExpandHeight = true;
 
         // Columna acción (fija 220 px)
-        var colAction = new GameObject("Action");
-        colAction.transform.SetParent(row.transform, false);
+        var colAction = MakeRect(row.transform, "Action");
         colAction.AddComponent<LayoutElement>().preferredWidth = 220f;
         var txtA = colAction.AddComponent<Text>();
         txtA.text      = action;
@@ -210,16 +184,17 @@ public class ControlsSceneRuntime : MonoBehaviour
         txtA.font      = GetUIFont();
 
         // Columna teclas con fondo (fija 340 px)
-        var keyBgGO = new GameObject("KeyBg");
-        keyBgGO.transform.SetParent(row.transform, false);
+        var keyBgGO = MakeRect(row.transform, "KeyBg");
         var keyLE = keyBgGO.AddComponent<LayoutElement>();
         keyLE.preferredWidth = 340f;
         keyLE.minHeight      = 46f;
-        keyBgGO.AddComponent<Image>().color = new Color(0.15f, 0.15f, 0.3f, 1f);
+        var keyBgImage = keyBgGO.AddComponent<Image>();
+        keyBgImage.sprite = UIRuntimeStyle.GetRoundedPanelSprite();
+        keyBgImage.type = Image.Type.Sliced;
+        keyBgImage.color = new Color(0.15f, 0.15f, 0.3f, 1f);
 
-        var keyTxt = new GameObject("KeyTxt");
-        keyTxt.transform.SetParent(keyBgGO.transform, false);
-        var kRT = keyTxt.AddComponent<RectTransform>();
+        var keyTxt = MakeRect(keyBgGO.transform, "KeyTxt");
+        var kRT = keyTxt.GetComponent<RectTransform>();
         kRT.anchorMin = Vector2.zero; kRT.anchorMax = Vector2.one;
         kRT.offsetMin = new Vector2(10, 0); kRT.offsetMax = new Vector2(-10, 0);
         var tk = keyTxt.AddComponent<Text>();
@@ -231,8 +206,7 @@ public class ControlsSceneRuntime : MonoBehaviour
         tk.font      = GetUIFont();
 
         // Columna descripción (flexible)
-        var colDesc = new GameObject("Desc");
-        colDesc.transform.SetParent(row.transform, false);
+        var colDesc = MakeRect(row.transform, "Desc");
         var descLE = colDesc.AddComponent<LayoutElement>();
         descLE.flexibleWidth = 1f;
         var txtD = colDesc.AddComponent<Text>();
@@ -314,7 +288,7 @@ public class ControlsSceneRuntime : MonoBehaviour
         if (FindAnyObjectByType<EventSystem>() != null) return;
         var go = new GameObject("EventSystem");
         go.AddComponent<EventSystem>();
-        go.AddComponent<StandaloneInputModule>();
+        go.AddComponent<InputSystemUIInputModule>();
     }
 
     void GoBack()
@@ -325,14 +299,14 @@ public class ControlsSceneRuntime : MonoBehaviour
     void Update()
     {
         // Fallback manual para el botón volver con clic
-        if (Input.GetMouseButtonDown(0))
+        if (GameInput.GetMouseButtonDown(0))
         {
             var footer = GameObject.Find("Footer");
             if (footer != null)
             {
                 var rt = footer.GetComponent<RectTransform>();
                 if (rt != null && RectTransformUtility.RectangleContainsScreenPoint(
-                        rt, Input.mousePosition, null))
+                        rt, GameInput.GetPointerPosition(), null))
                     GoBack();
             }
         }

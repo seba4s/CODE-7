@@ -121,20 +121,21 @@ public class PlayableTutorialDirector : MonoBehaviour
         switch (_current)
         {
             case 0: // Moverse — mantener tecla
-                _holdActive = Mathf.Abs(Input.GetAxisRaw("Horizontal")) > 0.1f;
+                _holdActive = Mathf.Abs(GameInput.GetMoveXRaw()) > 0.1f;
                 break;
 
             case 1: // Saltar — pulsación única
-                if (Input.GetButtonDown("Jump")) _singleFired = true;
+                if (GameInput.GetJumpDown()) _singleFired = true;
                 break;
 
             case 2: // Apuntar — mover mouse de forma sostenida
-                _holdActive = Mathf.Abs(Input.GetAxis("Mouse X")) > 0.15f
-                           || Mathf.Abs(Input.GetAxis("Mouse Y")) > 0.15f;
+                Vector2 lookDelta = GameInput.GetLookDelta();
+                _holdActive = Mathf.Abs(lookDelta.x) > 0.15f
+                           || Mathf.Abs(lookDelta.y) > 0.15f;
                 break;
 
             case 3: // Disparar — clic izquierdo
-                if (Input.GetMouseButtonDown(0)) _singleFired = true;
+                if (GameInput.GetMouseButtonDown(0)) _singleFired = true;
                 break;
 
             case 4: // Dash — detectar que el dash está activo
@@ -143,7 +144,7 @@ public class PlayableTutorialDirector : MonoBehaviour
         }
 
         // Saltar tutorial con ESC
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (GameInput.GetCancelDown())
             SkipTutorial();
     }
 

@@ -40,7 +40,7 @@ public class CrosshairRuntime : MonoBehaviour
     void Update()
     {
         if (_crossRT == null) return;
-        _crossRT.position = Input.mousePosition;
+        _crossRT.position = GameInput.GetPointerPosition();
     }
 
     // ── Construcción ──────────────────────────────────────────────

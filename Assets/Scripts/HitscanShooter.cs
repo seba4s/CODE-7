@@ -94,7 +94,7 @@ public class HitscanShooter : MonoBehaviour
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
 
         // Disparo con click izquierdo
-        if (Input.GetMouseButtonDown(0))
+        if (GameInput.GetPrimaryFireDown())
         {
             TryShoot();
         }
@@ -209,7 +209,7 @@ public class HitscanShooter : MonoBehaviour
     {
         if (cam != null)
         {
-            Vector3 mouse = Input.mousePosition;
+            Vector3 mouse = GameInput.GetPointerPosition();
             float targetZ = muzzle != null ? muzzle.position.z : transform.position.z;
             mouse.z = Mathf.Abs(cam.transform.position.z - targetZ);
             Vector3 world = cam.ScreenToWorldPoint(mouse);

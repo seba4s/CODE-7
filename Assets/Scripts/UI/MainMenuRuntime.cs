@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -33,7 +34,7 @@ public class MainMenuRuntime : MonoBehaviour
 
     void Update()
     {
-        if (!Input.GetMouseButtonDown(0)) return;
+        if (!GameInput.GetMouseButtonDown(0)) return;
 
         TryInvokeManual(playButton, OnPlayClicked);
         TryInvokeManual(controlsButton, OnControlsClicked);
@@ -59,36 +60,41 @@ public class MainMenuRuntime : MonoBehaviour
             new Color(0.05f, 0.05f, 0.1f, 1f));
         Stretch(bg);
 
-        // ── Panel central ────────────────────────────────────────
-        var panel = CreatePanel(bg.transform, "Panel", new Color(0f, 0f, 0f, 0.6f));
-        var panelRect = panel.GetComponent<RectTransform>();
-        panelRect.anchorMin = new Vector2(0.35f, 0.2f);
-        panelRect.anchorMax = new Vector2(0.65f, 0.85f);
+        var bgImage = bg.GetComponent<Image>();
+        var backgroundSprite = LoadSpriteFromResources("UI/MainMenu/fondo juego");
+        if (backgroundSprite != null)
+        {
+            bgImage.sprite = backgroundSprite;
+            bgImage.color = Color.white;
+            bgImage.type = Image.Type.Simple;
+            bgImage.preserveAspect = false;
+        }
+
+        var logoSprite = LoadSpriteFromResources("UI/MainMenu/menu codex recovered");
+        if (logoSprite != null)
+        {
+            var logo = CreateImage(bg.transform, "GameLogo", logoSprite, true);
+            var logoRect = logo.GetComponent<RectTransform>();
+            logoRect.anchorMin = logoRect.anchorMax = new Vector2(0.5f, 0.86f);
+            logoRect.anchoredPosition = new Vector2(0f, 10f);
+            logoRect.sizeDelta = GetFittedSize(logoSprite, 980f, 280f);
+        }
+
+        // ── Grupo de botones ─────────────────────────────────────
+        var panel = new GameObject("ButtonsGroup");
+        panel.transform.SetParent(bg.transform, false);
+        var panelRect = panel.AddComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0.37f, 0.24f);
+        panelRect.anchorMax = new Vector2(0.63f, 0.56f);
         panelRect.offsetMin = panelRect.offsetMax = Vector2.zero;
 
         // Layout vertical automático
         var layout = panel.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.spacing = 20f;
-        layout.padding = new RectOffset(40, 40, 40, 40);
+        layout.spacing = 22f;
+        layout.padding = new RectOffset(24, 24, 12, 12);
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
-
-        // ── Título ───────────────────────────────────────────────
-        var title = CreateText(panel.transform, "Title", "CODE-7",
-            72, Color.white, FontStyle.Bold);
-        title.GetComponent<LayoutElement>().minHeight = 120f;
-
-        // ── Subtítulo ────────────────────────────────────────────
-        var subtitle = CreateText(panel.transform, "Subtitle",
-            "Usa tus habilidades para sobrevivir", 26,
-            new Color(0.7f, 0.7f, 0.9f), FontStyle.Italic);
-        subtitle.GetComponent<LayoutElement>().minHeight = 50f;
-
-        // ── Espaciador ───────────────────────────────────────────
-        var spacer = new GameObject("Spacer");
-        spacer.transform.SetParent(panel.transform, false);
-        spacer.AddComponent<LayoutElement>().minHeight = 30f;
 
         // ── Botones ──────────────────────────────────────────────
         playButton = CreateMenuButton(panel.transform, "Jugar",
@@ -162,6 +168,17 @@ public class MainMenuRuntime : MonoBehaviour
         return go;
     }
 
+    GameObject CreateImage(Transform parent, string name, Sprite sprite, bool preserveAspect)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var img = go.AddComponent<Image>();
+        img.sprite = sprite;
+        img.preserveAspect = preserveAspect;
+        img.color = Color.white;
+        return go;
+    }
+
     Button CreateMenuButton(Transform parent, string label,
         Color bgColor, UnityEngine.Events.UnityAction onClick)
     {
@@ -169,10 +186,10 @@ public class MainMenuRuntime : MonoBehaviour
         go.transform.SetParent(parent, false);
 
         var le = go.AddComponent<LayoutElement>();
-        le.minHeight = 70f;
+        le.minHeight = 82f;
 
         var img = go.AddComponent<Image>();
-        img.color = bgColor;
+        UIRuntimeStyle.ApplyRoundedButtonStyle(img, bgColor);
 
         var btn = go.AddComponent<Button>();
 
@@ -212,13 +229,49 @@ public class MainMenuRuntime : MonoBehaviour
         return f;
     }
 
+    static Sprite LoadSpriteFromResources(string resourcePath)
+    {
+        var texture = Resources.Load<Texture2D>(resourcePath);
+        if (texture != null)
+        {
+            return Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+        }
+
+        var sprite = Resources.Load<Sprite>(resourcePath);
+        if (sprite != null) return sprite;
+
+        return null;
+    }
+
+    static Vector2 GetFittedSize(Sprite sprite, float maxWidth, float maxHeight)
+    {
+        if (sprite == null || sprite.rect.height <= 0f)
+            return new Vector2(maxWidth, maxHeight);
+
+        float aspect = sprite.rect.width / sprite.rect.height;
+        float width = maxWidth;
+        float height = width / aspect;
+
+        if (height > maxHeight)
+        {
+            height = maxHeight;
+            width = height * aspect;
+        }
+
+        return new Vector2(width, height);
+    }
+
     static void EnsureEventSystem()
     {
         if (FindAnyObjectByType<EventSystem>() != null) return;
 
         var es = new GameObject("EventSystem");
         es.AddComponent<EventSystem>();
-        es.AddComponent<StandaloneInputModule>();
+        es.AddComponent<InputSystemUIInputModule>();
     }
 
     void TryInvokeManual(Button button, UnityEngine.Events.UnityAction action)
@@ -226,7 +279,7 @@ public class MainMenuRuntime : MonoBehaviour
         if (button == null) return;
         var rect = button.GetComponent<RectTransform>();
         if (rect == null) return;
-        if (!RectTransformUtility.RectangleContainsScreenPoint(rect, Input.mousePosition, null)) return;
+        if (!RectTransformUtility.RectangleContainsScreenPoint(rect, GameInput.GetPointerPosition(), null)) return;
         action?.Invoke();
     }
 }
