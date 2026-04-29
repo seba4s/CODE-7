@@ -10,8 +10,10 @@ using UnityEngine.UI;
 /// </summary>
 public class MainMenuRuntime : MonoBehaviour
 {
-    Button playButton;
-    Button controlsButton;
+    Button newGameButton;
+    Button continueButton;
+    Button upgradesButton;
+    Button optionsButton;
     Button quitButton;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -36,8 +38,10 @@ public class MainMenuRuntime : MonoBehaviour
     {
         if (!GameInput.GetMouseButtonDown(0)) return;
 
-        TryInvokeManual(playButton, OnPlayClicked);
-        TryInvokeManual(controlsButton, OnControlsClicked);
+        TryInvokeManual(newGameButton, OnNewGameClicked);
+        TryInvokeManual(continueButton, OnContinueClicked);
+        TryInvokeManual(upgradesButton, OnUpgradesClicked);
+        TryInvokeManual(optionsButton, OnOptionsClicked);
         TryInvokeManual(quitButton, OnQuitClicked);
     }
 
@@ -91,25 +95,23 @@ public class MainMenuRuntime : MonoBehaviour
         // Layout vertical automático
         var layout = panel.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.spacing = 22f;
-        layout.padding = new RectOffset(24, 24, 12, 12);
-        layout.childForceExpandWidth = true;
+        layout.spacing = 16f;
+        layout.padding = new RectOffset(40, 40, 40, 40);
+        layout.childControlWidth = false;
+        layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
 
         // ── Botones ──────────────────────────────────────────────
-        playButton = CreateMenuButton(panel.transform, "Jugar",
-            new Color(0.2f, 0.6f, 0.2f), OnPlayClicked);
-
-        controlsButton = CreateMenuButton(panel.transform, "Controles",
-            new Color(0.2f, 0.4f, 0.7f), OnControlsClicked);
-
-        quitButton = CreateMenuButton(panel.transform, "Salir",
-            new Color(0.6f, 0.1f, 0.1f), OnQuitClicked);
+        newGameButton = CreateImageMenuButton(panel.transform, "NuevaPartida", "nueva partida", OnNewGameClicked);
+        continueButton = CreateImageMenuButton(panel.transform, "Continuar", "continuar", OnContinueClicked);
+        upgradesButton = CreateImageMenuButton(panel.transform, "Mejoras", "mejoras", OnUpgradesClicked);
+        optionsButton = CreateImageMenuButton(panel.transform, "Opciones", "opciones", OnOptionsClicked);
+        quitButton = CreateImageMenuButton(panel.transform, "Salir", "salir", OnQuitClicked);
     }
 
     // ── Callbacks ────────────────────────────────────────────────
 
-    void OnPlayClicked()
+    void OnNewGameClicked()
     {
         Time.timeScale = 1f;
         SceneManager.LoadScene(GameSceneConfig.CanLoadTutorialScene()
@@ -117,7 +119,19 @@ public class MainMenuRuntime : MonoBehaviour
             : GameSceneConfig.GameplayScene);
     }
 
-    void OnControlsClicked()
+    void OnContinueClicked()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(GameSceneConfig.GameplayScene);
+    }
+
+    void OnUpgradesClicked()
+    {
+        // Placeholder until an upgrades scene/system is added.
+        Debug.Log("Mejoras: aun no implementado.");
+    }
+
+    void OnOptionsClicked()
     {
         Time.timeScale = 1f;
         SceneManager.LoadScene(GameSceneConfig.ControlsScene);
@@ -179,47 +193,61 @@ public class MainMenuRuntime : MonoBehaviour
         return go;
     }
 
-    Button CreateMenuButton(Transform parent, string label,
-        Color bgColor, UnityEngine.Events.UnityAction onClick)
+    Button CreateImageMenuButton(Transform parent, string objectName,
+        string resourceSpriteName, UnityEngine.Events.UnityAction onClick)
     {
-        var go = new GameObject("Btn_" + label);
+        var go = new GameObject("Btn_" + objectName);
         go.transform.SetParent(parent, false);
 
         var le = go.AddComponent<LayoutElement>();
-        le.minHeight = 82f;
+        le.preferredWidth = 620f;
+        le.preferredHeight = 110f;
+        le.minHeight = 90f;
 
         var img = go.AddComponent<Image>();
-        UIRuntimeStyle.ApplyRoundedButtonStyle(img, bgColor);
+        img.color = Color.white;
+        img.sprite = LoadMenuSprite(resourceSpriteName);
+        img.preserveAspect = true;
+
+        if (img.sprite != null)
+        {
+            float aspect = img.sprite.rect.width / img.sprite.rect.height;
+            le.preferredHeight = le.preferredWidth / Mathf.Max(aspect, 0.01f);
+            le.minHeight = le.preferredHeight;
+        }
+        else
+        {
+            img.color = new Color(0.15f, 0.15f, 0.2f, 1f);
+        }
 
         var btn = go.AddComponent<Button>();
 
-        // Estado hover: aclara el color
         var colors = btn.colors;
-        colors.highlightedColor = new Color(
-            Mathf.Min(bgColor.r + 0.25f, 1f),
-            Mathf.Min(bgColor.g + 0.25f, 1f),
-            Mathf.Min(bgColor.b + 0.25f, 1f));
-        colors.pressedColor = new Color(
-            bgColor.r * 0.7f, bgColor.g * 0.7f, bgColor.b * 0.7f);
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(0.92f, 0.92f, 0.92f, 1f);
+        colors.pressedColor = new Color(0.78f, 0.78f, 0.78f, 1f);
+        colors.selectedColor = colors.normalColor;
         btn.colors = colors;
 
         btn.onClick.AddListener(onClick);
-
-        // Texto del botón
-        var txtGO = new GameObject("Label");
-        txtGO.transform.SetParent(go.transform, false);
-        var txtRect = txtGO.AddComponent<RectTransform>();
-        txtRect.anchorMin = Vector2.zero;
-        txtRect.anchorMax = Vector2.one;
-        txtRect.offsetMin = txtRect.offsetMax = Vector2.zero;
-        var txt = txtGO.AddComponent<Text>();
-        txt.text = label;
-        txt.fontSize = 36;
-        txt.color = Color.white;
-        txt.fontStyle = FontStyle.Bold;
-        txt.alignment = TextAnchor.MiddleCenter;
-        txt.font = GetUIFont();
         return btn;
+    }
+
+    Sprite LoadMenuSprite(string spriteName)
+    {
+        string resourcePath = "MenuButtons/" + spriteName;
+
+        var sprite = Resources.Load<Sprite>(resourcePath);
+        if (sprite != null) return sprite;
+
+        var tex = Resources.Load<Texture2D>(resourcePath);
+        if (tex == null) return null;
+
+        return Sprite.Create(
+            tex,
+            new Rect(0f, 0f, tex.width, tex.height),
+            new Vector2(0.5f, 0.5f),
+            100f);
     }
 
     static Font GetUIFont()
